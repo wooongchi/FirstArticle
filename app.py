@@ -11,18 +11,11 @@ app = Flask(__name__)
 
 
 def get_info_article_status(article_id, club_id, future_session):
-    # 프록시 접속
-    # proxy_url = get_proxy()
-    # time.sleep(0.05)
-    pp = future_session.get(REQUEST_URL_SEARCH_ARTICLE.format(cafe_id=club_id, article_id=article_id)  # ,
-                            # proxies={"http": proxy_url, "https": proxy_url}
-                            )
-    # a = pp.result().status_code
+    pp = future_session.get(REQUEST_URL_SEARCH_ARTICLE.format(cafe_id=club_id, article_id=article_id))
     resp = {
         "articleId": article_id,
         "status_code": pp.result().status_code
     }
-    # time.sleep(0.05)
     return resp
 
 
@@ -33,13 +26,6 @@ def cafe_article_list_check(check_article_list_json):
         club_id = check_article_list_json['club_id']
     else:
         club_id = get_club_id()
-
-    # 제재할 랜덤 스텝 정보 조회 (step_id, step_nickname, step_passwd 반환)
-    # random_step_info = random_step(club_id)
-    # step_id = random_step_info[0]
-    # # step_nickname = random_step_info[1]
-    # step_passwd = decode_password(random_step_info[2])
-    # step_login_id = random_step_info[3]
 
     # 카페 세션 생성
     step_id = get_user_id()

@@ -76,13 +76,3 @@ REQUEST_URL_SEND_NOTE ='https://note.naver.com/json/write/send/'
 REFERER_URL_MOVE_ARTICLE = 'https://cafe.naver.com/ArticleMove.nhn?m=view&clubid=%s&menuid=%s&articleid=%s'
 REQUEST_URL_MOVE_ARTICLE = 'https://cafe.naver.com/ArticleMove.nhn'
 REQUEST_URL_CREATE_ARTICLE = 'https://apis.naver.com/cafe-web/cafe-editor-api/v1.0/cafes/{cafe_id}/menus/{menu_id}/articles'
-
-def get_proxy():
-    r"""
-    프록시 설정
-    :return: proxy 주소
-    :rtype: str
-    """
-    password = '4bE9XLA2pPssREqAxx8AfLbGm'
-    return f"http://auto:{password}@proxy.apify.com:8000"
-
