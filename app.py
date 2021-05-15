@@ -2,13 +2,14 @@ from session import *
 from flask import Flask, jsonify
 from urllib.parse import urlencode
 from connection import *
+from crawling import crawling_articles
 
 app = Flask(__name__)
 
 
 def get_info_article_status(cafe_session, article_id):
     club_id = get_club_id()
-    response = cafe_session.get(REQUEST_URL_SEARCH_ARTICLE.format(cafe_id=club_id, article_id=article_id))
+    response = cafe_session.get(REQUEST_URL_SEARCH_ARTICLE.format(club_id=club_id, article_id=article_id))
     resp = {
         "article_id": article_id,
         "status_code": response.status_code,
@@ -60,7 +61,7 @@ def get_article_data(cafe_session, article_id):
         "sec-fetch-site": "same-site",
         "x-cafe-product": "pc"
     }
-    response = cafe_session.get(REQUEST_URL_EDIT_ARTICLE.format(cafe_id=str(club_id), article_id=article_id),
+    response = cafe_session.get(REQUEST_URL_EDIT_ARTICLE.format(club_id=str(club_id), article_id=article_id),
                                 headers=request_headers)
 
     return response.json()['result']
@@ -116,7 +117,7 @@ def cafe_article_create(cafe_session, article_data):
             "useCcl": False
         }
     }
-    create_response = cafe_session.post(REQUEST_URL_CREATE_ARTICLE.format(cafe_id=str(club_id), menu_id=str(menu_id)),
+    create_response = cafe_session.post(REQUEST_URL_CREATE_ARTICLE.format(club_id=str(club_id), menu_id=str(menu_id)),
                                         json=params,
                                         headers=request_headers)
 
@@ -124,7 +125,7 @@ def cafe_article_create(cafe_session, article_data):
                     'data': {'new_article_id': create_response.json()['result']['articleId']}})
 
 
-def delete_and_create_article_on_naver(article_id):
+def delete_and_create_article_on_naver(article_id, target_word):
     try:
         # ------------------------------------------------- 네이버 로그인  -------------------------------------------------
         step_id = get_user_id()
@@ -136,6 +137,12 @@ def delete_and_create_article_on_naver(article_id):
         except Exception as e:
             print("존재하지 않는 게시글입니다.")
             return jsonify({'meta': {'code': 404, 'message': "article doesn't exist"}})
+        # -------------------------------------------- 네이버에서 게시글 검색 수행 --------------------------------------------
+        menu_id = article_data['selectedMenu']['menu']['menuId']
+        article_list = crawling_articles(cafe_session, menu_id, article_id, target_word, step_id)
+        if article_list.status_code != 200:
+            print("크롤링 실패")
+            return jsonify({'meta': {'code': 400, 'message': "crawling fail"}})
         # -------------------------------------------- 네이버에서 게시글 삭제 수행 --------------------------------------------
         delete_article_cafe_result = cafe_article_list_delete(cafe_session, article_id)
         if delete_article_cafe_result.status_code != 200:
@@ -143,9 +150,9 @@ def delete_and_create_article_on_naver(article_id):
             return jsonify({'meta': {'code': 403, 'message': "article doesn't deleted"}})
         # ------------------------------------------ 네이버에서 정상삭제되었는지 확인 -------------------------------------------
         # 네이버 카페에 존재하는 게시글만 선별
-        # article_check_in_cafe = get_info_article_status(cafe_session, article_id)
-        # if article_check_in_cafe['status_code'] != 404:
-        #     print("삭제 실패!!!")
+        article_check_in_cafe = get_info_article_status(cafe_session, article_id)
+        if article_check_in_cafe['status_code'] != 404:
+            print("삭제 실패!!!")
         # ------------------------------------------- 네이버에 다시 게시글 등록 -----------------------------------------------
         new_article = cafe_article_create(cafe_session, article_data)
         return jsonify({'meta': {'code': 200, 'message': 'success'},
@@ -156,11 +163,12 @@ def delete_and_create_article_on_naver(article_id):
 
 @app.route('/')
 def hello_world():
-    result = delete_and_create_article_on_naver(27)
-    if result.json['meta']['code'] == 200:
-        return str(result.json['data']['new_article_id'])
-    else:
-        return "실패"
+    while True:
+        result = delete_and_create_article_on_naver(31, "아이패드")
+        if result.json['meta']['code'] == 200:
+            delete_and_create_article_on_naver(result.json['data']['new_article_id'], "아이패드")
+        else:
+            return "실패"
 
 
 if __name__ == '__main__':

@@ -54,8 +54,12 @@ def naver_session(nid, npw):
     return s
 
 
-REQUEST_URL_SEARCH_ARTICLE = 'https://apis.naver.com/cafe-web/cafe-articleapi/v2/cafes/{cafe_id}/articles/{article_id}'
-REQUEST_URL_EDIT_ARTICLE = 'https://apis.naver.com/cafe-web/cafe-editor-api/v1.0/cafes/{cafe_id}/editor?experienceMode=true&articleId={article_id}&from=pc'
+CAFE_ARTICLE_LIST_ALL_URL = 'https://apis.naver.com/cafe-web/cafe2/ArticleList.json?search.clubid={club_id}&search.queryType=lastArticle&search.page='
+CAFE_ARTICLE_LIST_MENU_ID_URL = 'https://apis.naver.com/cafe-web/cafe2/ArticleList.json?search.clubid={club_id}&search.queryType=lastArticle&search.menuid={menu_id}&search.page='
+CAFE_ARTICLE_DETAIL_URL = 'https://apis.naver.com/cafe-web/cafe-articleapi/v2/cafes/{club_id}/articles/{article_id}?fromList=true&useCafeId=true'
+CAFE_MENU_LIST_URL = 'https://cafe.naver.com/ManageMenuListViewAjax.nhn'
+REQUEST_URL_SEARCH_ARTICLE = 'https://apis.naver.com/cafe-web/cafe-articleapi/v2/cafes/{club_id}/articles/{article_id}'
+REQUEST_URL_EDIT_ARTICLE = 'https://apis.naver.com/cafe-web/cafe-editor-api/v1.0/cafes/{club_id}/editor?experienceMode=true&articleId={article_id}&from=pc'
 REQUEST_URL_DELETE_ARTICLE = 'https://apis.naver.com/cafe-web/cafe2/ArticleDelete.json'
 REQUEST_URL_DELETE_ARTICLE_LIST = 'https://cafe.naver.com/ArticleDelete.nhn'
 FORM_DATA_DELETE_ARTICLE = {
@@ -76,4 +80,4 @@ REQUEST_URL_FORCE_EJECT_MEMBER = 'https://cafe.naver.com/ManageSecedePopup.nhn'
 REQUEST_URL_SEND_NOTE ='https://note.naver.com/json/write/send/'
 REFERER_URL_MOVE_ARTICLE = 'https://cafe.naver.com/ArticleMove.nhn?m=view&clubid=%s&menuid=%s&articleid=%s'
 REQUEST_URL_MOVE_ARTICLE = 'https://cafe.naver.com/ArticleMove.nhn'
-REQUEST_URL_CREATE_ARTICLE = 'https://apis.naver.com/cafe-web/cafe-editor-api/v1.0/cafes/{cafe_id}/menus/{menu_id}/articles'
+REQUEST_URL_CREATE_ARTICLE = 'https://apis.naver.com/cafe-web/cafe-editor-api/v1.0/cafes/{club_id}/menus/{menu_id}/articles'
