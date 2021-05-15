@@ -55,6 +55,7 @@ def naver_session(nid, npw):
 
 
 REQUEST_URL_SEARCH_ARTICLE = 'https://apis.naver.com/cafe-web/cafe-articleapi/v2/cafes/{cafe_id}/articles/{article_id}'
+REQUEST_URL_EDIT_ARTICLE = 'https://apis.naver.com/cafe-web/cafe-editor-api/v1.0/cafes/{cafe_id}/editor?experienceMode=true&articleId={article_id}&from=pc'
 REQUEST_URL_DELETE_ARTICLE = 'https://apis.naver.com/cafe-web/cafe2/ArticleDelete.json'
 REQUEST_URL_DELETE_ARTICLE_LIST = 'https://cafe.naver.com/ArticleDelete.nhn'
 FORM_DATA_DELETE_ARTICLE = {

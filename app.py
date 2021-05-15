@@ -1,87 +1,28 @@
-import json
 from session import *
-from flask import Flask, current_app, jsonify, json
+from flask import Flask, jsonify
 from urllib.parse import urlencode
-from concurrent.futures import ThreadPoolExecutor
-from requests_futures.sessions import FuturesSession
-from concurrent import futures
 from connection import *
 
 app = Flask(__name__)
 
 
-def get_info_article_status(article_id, club_id, future_session):
-    pp = future_session.get(REQUEST_URL_SEARCH_ARTICLE.format(cafe_id=club_id, article_id=article_id))
+def get_info_article_status(cafe_session, article_id):
+    club_id = get_club_id()
+    response = cafe_session.get(REQUEST_URL_SEARCH_ARTICLE.format(cafe_id=club_id, article_id=article_id))
     resp = {
-        "articleId": article_id,
-        "status_code": pp.result().status_code
+        "article_id": article_id,
+        "status_code": response.status_code,
+        "response": response.json()
     }
     return resp
 
 
-def cafe_article_list_check(check_article_list_json):
-    # log(request, {'message': 'cafeService.cafe_article_list_check is begin!!'})
-    article_id_list = check_article_list_json['article_id_list']
-    if 'club_id' in check_article_list_json.keys() and check_article_list_json['club_id'] != "":
-        club_id = check_article_list_json['club_id']
-    else:
-        club_id = get_club_id()
-
-    # 카페 세션 생성
-    step_id = get_user_id()
-    step_passwd = get_user_password()
-
-    cafe_session = naver_session(step_id, step_passwd)
-    # future 세션 생성
-    future_session = FuturesSession(session=cafe_session)
-
-    # 게시글 수 정의
-    # tot_counts = len(article_id_list)
-    # exist_article_counts = 0
-    # not_exist_article_counts = 0
-
-    exist_article_list = []
-    not_exist_article_list = []
-
-    with ThreadPoolExecutor(max_workers=50) as exe:
-        future_to_url = {exe.submit(get_info_article_status, article_id, club_id, future_session): article_id for
-                         article_id in article_id_list}
-        for future in futures.as_completed(future_to_url):
-            article_id = future_to_url[future]
-            try:
-                resp = future.result()
-                # 게시글 유무 리스트를 분리해서 담는다.
-                if resp["status_code"] == 200:
-                    exist_article_list.append(resp["articleId"])
-                    # exist_article_counts += 1
-                else:
-                    not_exist_article_list.append(resp["articleId"])
-                    # not_exist_article_counts += 1
-            except Exception as exp:
-                print("%r generated an exception: %s" % (article_id, exp))
-
-    return jsonify({'meta': {'code': '200', 'message': 'success'},
-                    'data': {'exist_article_list': exist_article_list,
-                             'not_exist_article_list': not_exist_article_list}})
-
-
 # 카페에서 게시글리스트 삭제
-def cafe_article_list_delete(article_ids):
-    # proxy_url = get_proxy()
-
-    string_article_ids = [str(articleid) for articleid in article_ids]
-    articleids = ",".join(string_article_ids)
+def cafe_article_list_delete(cafe_session, article_id):
     # cafe id
     club_id = get_club_id()
 
-    # 제재할 랜덤 스텝 정보 조회 (step_id, step_nickname, step_passwd 반환)
-    step_id = get_user_id()
-    step_passwd = get_user_password()
-
-    cafe_session = naver_session(step_id, step_passwd)
-
-    referer = 'https://cafe.naver.com/ArticleList.nhn?search.clubid=%s' % club_id
-
+    referer = f'https://cafe.naver.com/ArticleList.nhn?search.clubid={club_id}'
     request_headers = {
         'User-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36',
         'Content-Type': 'application/x-www-form-urlencoded', 'Referer': referer}
@@ -91,31 +32,19 @@ def cafe_article_list_delete(article_ids):
     form_data_delete_article_list['menuid'] = ''
     form_data_delete_article_list['boardtype'] = 'L'
     form_data_delete_article_list['page'] = 1
-    form_data_delete_article_list['articleid'] = articleids
+    form_data_delete_article_list['articleid'] = article_id
     form_data_delete_article_list['userDisplay'] = 15
 
     form_parameters = urlencode(form_data_delete_article_list)
     delete_response = cafe_session.post(REQUEST_URL_DELETE_ARTICLE_LIST, params=form_parameters,
                                         headers=request_headers)
 
-    return jsonify({'meta': {'code': delete_response.status_code, 'message': delete_response.reason},
-                    'data': {'step_id': step_id}})
+    return jsonify({'meta': {'code': delete_response.status_code, 'message': delete_response.reason}})
 
 
-# 카페에서 게시글 등록
-def cafe_article_create(article_id):
-    # proxy_url = get_proxy()
-
-    # cafe id
+def get_article_data(cafe_session, article_id):
     club_id = get_club_id()
-
-    # 제재할 랜덤 스텝 정보 조회 (step_id, step_nickname, step_passwd 반환)
-    step_id = get_user_id()
-    step_passwd = get_user_password()
-
-    cafe_session = naver_session(step_id, step_passwd)
-
-    referer = 'https://cafe.naver.com/ca-fe/cafes/%s/articles/write?boardType=L' % club_id
+    referer = f'https://cafe.naver.com/ca-fe/cafes/{club_id}/articles/{article_id}/modify'
 
     request_headers = {
         'accept': 'application/json, text/plain, */*',
@@ -123,7 +52,31 @@ def cafe_article_create(article_id):
         'accept-language': 'ko-KR,ko;q=0.9',
         'User-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36',
         'Content-Type': 'application/json;charset=UTF-8',
-        # 'origin': 'https://cafe.naver.com',
+        'Referer': referer,
+        "sec-ch-ua": '"Chromium";v="86", "\"Not\\A;Brand";v = "99", "Whale";v = "2"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-site",
+        "x-cafe-product": "pc"
+    }
+    response = cafe_session.get(REQUEST_URL_EDIT_ARTICLE.format(cafe_id=str(club_id), article_id=article_id),
+                                headers=request_headers)
+
+    return response.json()['result']
+
+
+# 카페에서 게시글 등록
+def cafe_article_create(cafe_session, article_data):
+    # cafe id
+    club_id = get_club_id()
+    referer = f'https://cafe.naver.com/ca-fe/cafes/{club_id}/articles/write?boardType=L'
+    request_headers = {
+        'accept': 'application/json, text/plain, */*',
+        'accept-encoding': 'gzip, deflate, br',
+        'accept-language': 'ko-KR,ko;q=0.9',
+        'User-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36',
+        'Content-Type': 'application/json;charset=UTF-8',
         'Referer': referer,
         "sec-ch-ua": '"Chromium";v="86", "\"Not\\A;Brand";v = "99", "Whale";v = "2"',
         "sec-ch-ua-mobile": "?0",
@@ -131,94 +84,84 @@ def cafe_article_create(article_id):
         "sec-fetch-mode": "cors",
         "sec-fetch-site": "same-site"
     }
-    # params = {
-    #     "cafeId": "30446983",
-    #     "cclTypes": [],
-    #     "contentJson": {"document": {"version": "2.5.2", "theme": "default", "language": "ko-KR", "components": [
-    #         {"id": "SE-990774f2-c9b8-471a-a401-40ee49a94ee0", "layout": "default", "value": [
-    #             {"id": "SE-47cb29c2-55ec-490d-bca3-ef86b5797753", "nodes": [
-    #                 {"id": "SE-9e4c9eb9-5047-4e70-aa98-2a3794a1db62", "value": "잘나오나?", "@ctype": "textNode"}],
-    #              "@ctype": "paragraph"}], "@ctype": "text"}]}, "documentId": ""},
-    #     "editorVersion": 4,
-    #     "enableComment": True,
-    #     "enableCopy": False,
-    #     "enableScrap": False,
-    #     "externalOpen": False,
-    #     "from": "pc",
-    #     "menuId": 1,
-    #     "naverOpen": True,
-    #     "open": False,
-    #     "parentId": 0,
-    #     "subject": "api 테스트",
-    #     "tagList": [],
-    #     "useAutoSource": False,
-    #     "useCcl": False
-    # }
-    params = {"article": {"cafeId": "30446983",
-                          "contentJson": "{\"document\":{\"version\":\"2.5.2\",\"theme\":\"default\",\"language\":\"ko-KR\",\"components\":[{\"id\":\"SE-990774f2-c9b8-471a-a401-40ee49a94ee0\",\"layout\":\"default\",\"value\":[{\"id\":\"SE-47cb29c2-55ec-490d-bca3-ef86b5797753\",\"nodes\":[{\"id\":\"SE-9e4c9eb9-5047-4e70-aa98-2a3794a1db62\",\"value\":\"testtest\",\"@ctype\":\"textNode\"}],\"@ctype\":\"paragraph\"}],\"@ctype\":\"text\"}]},\"documentId\":\"\"}",
-                          "from": "pc", "menuId": 1, "subject": "api", "tagList": [], "editorVersion": 4, "parentId": 0,
-                          "open": False, "naverOpen": True, "externalOpen": False, "enableComment": True,
-                          "enableScrap": False,
-                          "enableCopy": False, "useAutoSource": False, "cclTypes": [], "useCcl": False}}
-
-    # form_parameters = urlencode(params)
-    create_response = cafe_session.post(REQUEST_URL_CREATE_ARTICLE.format(cafe_id=str(club_id), menu_id='1'),
+    content_json = article_data['article']['contentJson']
+    menu_id = article_data['selectedMenu']['menu']['menuId']
+    subject = article_data['article']['subject']
+    open = article_data['options']['open']
+    naver_open = article_data['options']['naverOpen']
+    external_open = article_data['options']['externalOpen']
+    enable_comment = article_data['options']['enableComment']
+    enable_scrap = article_data['options']['enableScrap']
+    enable_copy = article_data['options']['enableCopy']
+    use_auto_source = article_data['options']['useAutoSource']
+    ccl_yypes = article_data['options']['cclTypes']
+    params = {
+        "article": {
+            "cafeId": club_id,
+            "contentJson": content_json,
+            "from": "pc",
+            "menuId": menu_id,
+            "subject": subject,
+            "tagList": [],
+            "editorVersion": 4,
+            "parentId": 0,
+            "open": open,
+            "naverOpen": naver_open,
+            "externalOpen": external_open,
+            "enableComment": enable_comment,
+            "enableScrap": enable_scrap,
+            "enableCopy": enable_copy,
+            "useAutoSource": use_auto_source,
+            "cclTypes": ccl_yypes,
+            "useCcl": False
+        }
+    }
+    create_response = cafe_session.post(REQUEST_URL_CREATE_ARTICLE.format(cafe_id=str(club_id), menu_id=str(menu_id)),
                                         json=params,
                                         headers=request_headers)
 
     return jsonify({'meta': {'code': create_response.status_code, 'message': create_response.reason},
-                    'data': {'step_id': step_id}})
+                    'data': {'new_article_id': create_response.json()['result']['articleId']}})
 
 
-def delete_article_on_naver(article_ids):
-    # check_article_list_json = dict({'article_id_list': article_ids})
-    # article_check_in_cafe = cafe_article_list_check(check_article_list_json)
+def delete_and_create_article_on_naver(article_id):
     try:
+        # ------------------------------------------------- 네이버 로그인  -------------------------------------------------
+        step_id = get_user_id()
+        step_passwd = get_user_password()
+        cafe_session = naver_session(step_id, step_passwd)
+        # -------------------------------------------- 네이버에서 게시글 정보 수집 --------------------------------------------
+        try:
+            article_data = get_article_data(cafe_session, article_id)
+        except Exception as e:
+            print("존재하지 않는 게시글입니다.")
+            return jsonify({'meta': {'code': 404, 'message': "article doesn't exist"}})
         # -------------------------------------------- 네이버에서 게시글 삭제 수행 --------------------------------------------
-        success_cafe_delete_ids = []
-        failed_cafe_delete_ids = []
-        if len(article_ids) > 0:
-            # tic = perf_counter()
-            delete_article_cafe_result = cafe_article_list_delete(article_ids)
-            cafe_del_result = delete_article_cafe_result.get_json()
-            step_id = str(cafe_del_result['data']['step_id'])
-            # toc = perf_counter()
-            # time_second = f"[DAL]delete_article [naver delete] time took {toc - tic:0.4f} seconds. "
-            # log(request, {'message': time_second + str(article_ids)})
-
-            # ------------------------------------------ 네이버에서 정상삭제되었는지 확인 ------------------------------------------
-            # 네이버 카페에 존재하는 게시글만 선별
-            # tic = perf_counter()
-            check_article_list_json = dict({'article_id_list': article_ids})
-            article_check_in_cafe = cafe_article_list_check(check_article_list_json).get_json()
-            # toc = perf_counter()
-            # time_second = f"[DAL]delete_article [naver check2] time took {toc - tic:0.4f} seconds. "
-            # log(request, {'message': time_second + str(article_ids)})
-
-            success_cafe_delete_ids = article_check_in_cafe['data']['not_exist_article_list']
-            failed_cafe_delete_ids = article_check_in_cafe['data']['exist_article_list']
-
-        result = jsonify({'meta': {'code': 200, 'message': 'success'},
-                          'data': {'success_cafe_delete_ids': success_cafe_delete_ids,
-                                   'failed_cafe_delete_ids': failed_cafe_delete_ids,
-                                   # 'cafe_not_exist_article_ids': cafe_not_exist_article_ids,
-                                   'step_id': step_id}
-                          })
-
-        return result
+        delete_article_cafe_result = cafe_article_list_delete(cafe_session, article_id)
+        if delete_article_cafe_result.status_code != 200:
+            print("게시글 삭제에 실패했습니다.")
+            return jsonify({'meta': {'code': 403, 'message': "article doesn't deleted"}})
+        # ------------------------------------------ 네이버에서 정상삭제되었는지 확인 -------------------------------------------
+        # 네이버 카페에 존재하는 게시글만 선별
+        # article_check_in_cafe = get_info_article_status(cafe_session, article_id)
+        # if article_check_in_cafe['status_code'] != 404:
+        #     print("삭제 실패!!!")
+        # ------------------------------------------- 네이버에 다시 게시글 등록 -----------------------------------------------
+        new_article = cafe_article_create(cafe_session, article_data)
+        return jsonify({'meta': {'code': 200, 'message': 'success'},
+                        'data': {'new_article_id': new_article.json['data']['new_article_id']}})
     except Exception as e:
-        # error_log(request, 500, {'message': '[DAL]delete_article_on_naver Exception!!'})
-        # raise InvalidUsage(traceback.format_exc(), status_code=500)
-        jsonify({'meta': {'code': 400, 'message': 'fail'}})
+        jsonify({'meta': {'code': 400, 'message': 'Bad Request'}})
 
 
 @app.route('/')
 def hello_world():
-    cafe_article_create(2)
-    # delete_article_on_naver([3])
-    return 'Hello World!'
+    result = delete_and_create_article_on_naver(27)
+    if result.json['meta']['code'] == 200:
+        return str(result.json['data']['new_article_id'])
+    else:
+        return "실패"
 
 
 if __name__ == '__main__':
-    # cafe_article_create(2)
     app.run()
